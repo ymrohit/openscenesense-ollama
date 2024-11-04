@@ -8,11 +8,12 @@
 2. [🌟 Features](#-features)
 3. [📦 Installation](#-installation)
 4. [🛠️ Usage](#-usage)
-5. [🎯 Customizing Prompts](#-customizing-prompts)
-6. [📈 Applications](#-applications)
-7. [🛠️ Contributing](#-contributing)
-8. [📄 License](#-license)
-9. [📄 Additional Resources](Docs/prompts.md)
+5. [⚙️ Configuration Options](#-configuration-options)
+6. [🎯 Customizing Prompts](#-customizing-prompts)
+7. [📈 Applications](#-applications)
+8. [🛠️ Contributing](#-contributing)
+9. [📄 License](#-license)
+10. [📄 Additional Resources](Docs/prompts.md)
 
 ## 🚀 Why OpenSceneSense Ollama?
 
@@ -143,7 +144,125 @@ print("\nMetadata:")
 for key, value in results['metadata'].items():
     print(f"{key}: {value}")
 ```
+## ⚙️ Configuration Options
 
+The `OllamaVideoAnalyzer` class offers extensive configuration options to customize the analysis process:
+
+### Basic Configuration
+
+- **frame_analysis_model** (str, default="llava")
+  - The Ollama model to use for analyzing individual frames
+  - Common options: "llava", "minicpm-v", "bakllava"
+  - Choose models with vision capabilities for best results
+
+- **summary_model** (str, default="claude-3-haiku")
+  - The Ollama model used for generating video summaries
+  - Common options: "llama3.2", "mistral", "claude-3-haiku"
+  - Text-focused models work best for summarization
+
+- **host** (str, default="http://localhost:11434")
+  - The URL where your Ollama instance is running
+  - Modify if running Ollama on a different port or remote server
+
+### Frame Selection Parameters
+
+- **min_frames** (int, default=8)
+  - Minimum number of frames to analyze
+  - Lower values result in faster analysis but might miss details
+  - Recommended range: 6-12 for short videos
+
+- **max_frames** (int, default=64)
+  - Maximum number of frames to analyze
+  - Higher values provide more detailed analysis but increase processing time
+  - Consider your hardware capabilities when adjusting this
+
+- **frames_per_minute** (float, default=4.0)
+  - Target rate of frame extraction
+  - Higher values capture more temporal detail
+  - Balance between detail and processing time
+  - Recommended ranges:
+    - 2-4 fps: Simple videos with minimal action
+    - 4-8 fps: Standard content
+    - 8+ fps: Fast-paced or complex scenes
+
+### Component Configuration
+
+- **frame_selector** (Optional[FrameSelector], default=None)
+  - Custom frame selection strategy
+  - Defaults to basic uniform selection if None
+  - Available built-in selectors:
+    - `DynamicFrameSelector`: Adapts to scene changes
+    - `UniformFrameSelector`: Evenly spaced frames
+    - `ContentAwareSelector`: Selects based on visual importance
+
+- **audio_transcriber** (Optional[AudioTranscriber], default=None)
+  - Component for handling audio transcription
+  - Defaults to no audio processing if None
+  - Common options:
+    ```python
+    WhisperTranscriber(
+        model_name="openai/whisper-tiny",
+        device="cuda"  # or "cpu"
+    )
+    ```
+
+- **prompts** (Optional[AnalysisPrompts], default=None)
+  - Customized prompts for different analysis stages
+  - Defaults to standard prompts if None
+  - Customize using the `AnalysisPrompts` class
+
+### Advanced Options
+
+- **custom_frame_processor** (Optional[Callable[[Frame], Dict]], default=None)
+  - Custom function for processing individual frames
+  - Allows integration of additional analysis tools
+  - Must accept a Frame object and return a dictionary
+  - Example:
+    ```python
+    def custom_processor(frame: Frame) -> Dict:
+        return {
+            "timestamp": frame.timestamp,
+            "custom_data": your_analysis(frame.image)
+        }
+    ```
+
+- **log_level** (int, default=logging.INFO)
+  - Controls verbosity of logging output
+  - Common levels:
+    - `logging.DEBUG`: Detailed debugging information
+    - `logging.INFO`: General operational information
+    - `logging.WARNING`: Warning messages only
+    - `logging.ERROR`: Error messages only
+
+### Example Configuration
+
+Here's an example of a fully configured analyzer with custom settings:
+
+```python
+analyzer = OllamaVideoAnalyzer(
+    frame_analysis_model="llava",
+    summary_model="llama3.2",
+    host="http://localhost:11434",
+    min_frames=12,
+    max_frames=48,
+    frames_per_minute=6.0,
+    frame_selector=DynamicFrameSelector(
+        threshold=0.3,
+        min_scene_length=1.0
+    ),
+    audio_transcriber=WhisperTranscriber(
+        model_name="openai/whisper-base",
+        device="cuda"
+    ),
+    prompts=AnalysisPrompts(
+        frame_analysis="Detailed frame analysis prompt...",
+        detailed_summary="Custom summary template...",
+        brief_summary="Brief summary template..."
+    ),
+    custom_frame_processor=your_custom_processor,
+    log_level=logging.DEBUG
+)
+```
 ## 🎯 Customizing Prompts
 
 OpenSceneSense Ollama allows you to customize prompts for different types of analyses. The `AnalysisPrompts` class accepts the following parameters:
