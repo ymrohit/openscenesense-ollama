@@ -13,8 +13,8 @@ import time
 class OllamaVideoAnalyzer:
     def __init__(
             self,
-            frame_analysis_model: str = "llava",
-            summary_model: str = "claude-3-haiku",
+            frame_analysis_model: str = "minicpm-v",
+            summary_model: str = "llama3.2",
             host: str = "http://localhost:11434",
             min_frames: int = 8,
             max_frames: int = 64,
