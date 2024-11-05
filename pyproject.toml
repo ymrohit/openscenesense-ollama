@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "openscenesense-ollama"
-version = "1.0.1"
+version = "1.0.2"
 description = "Offline video analysis using Ollama models and local Whisper"
 authors = [{name = "Rohit Yelukati Mahendra", email = "mahendrarohittigon@gmail.com"}]
 readme = "README.md"
