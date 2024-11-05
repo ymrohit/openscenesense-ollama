@@ -7,6 +7,7 @@ name = "openscenesense-ollama"
 version = "1.0.0"
 description = "Offline video analysis using Ollama models and local Whisper"
 authors = [{name = "Rohit Yelukati Mahendra", email = "mahendrarohittigon@gmail.com"}]
+readme = "README.md"
 requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Python :: 3",
