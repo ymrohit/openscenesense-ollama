@@ -150,12 +150,12 @@ The `OllamaVideoAnalyzer` class offers extensive configuration options to custom
 
 ### Basic Configuration
 
-- **frame_analysis_model** (str, default="llava")
+- **frame_analysis_model** (str, default="minicpm-v")
   - The Ollama model to use for analyzing individual frames
   - Common options: "llava", "minicpm-v", "bakllava"
   - Choose models with vision capabilities for best results
 
-- **summary_model** (str, default="claude-3-haiku")
+- **summary_model** (str, default="llama3.2")
   - The Ollama model used for generating video summaries
   - Common options: "llama3.2", "mistral", "claude-3-haiku"
   - Text-focused models work best for summarization
