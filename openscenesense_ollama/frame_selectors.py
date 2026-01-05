@@ -34,6 +34,9 @@ class FrameSelector(ABC):
 
 class DynamicFrameSelector(FrameSelector):
     """Dynamic frame selection strategy based on scene changes and motion"""
+    def __init__(self, threshold: float = 20.0):
+        super().__init__()
+        self.threshold = threshold
 
     def select_frames(self, video_path: str, analyzer: 'OllamaVideoAnalyzer') -> List[Frame]:
         self.logger.info("Starting dynamic frame selection")
@@ -49,7 +52,7 @@ class DynamicFrameSelector(FrameSelector):
         self.logger.info(f"Dynamic frame selection completed. Selected {len(frames)} frames")
         return frames
 
-    def _detect_scene_changes(self, video_path: str, cap: cv2.VideoCapture, threshold: float = 20.0) -> List[float]:
+    def _detect_scene_changes(self, video_path: str, cap: cv2.VideoCapture) -> List[float]:
         """Detect significant scene changes in the video"""
         self.logger.info("Detecting scene changes")
         scene_changes = []
@@ -65,7 +68,7 @@ class DynamicFrameSelector(FrameSelector):
             if prev_frame is not None:
                 diff_score = self._calculate_frame_difference(prev_frame, frame)
 
-                if diff_score > threshold:
+                if diff_score > self.threshold:
                     timestamp = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
                     scene_changes.append(timestamp)
 
