@@ -16,7 +16,7 @@ def main():
     try:
         # Initialize Whisper transcriber
         transcriber = WhisperTranscriber(
-            model_name="openai/whisper-tiny",
+            model_name="openai/whisper-small",
             #chunk_length_s=30,
             #batch_size=8
         )
@@ -45,29 +45,39 @@ def main():
 
         # Analyze video
         video_path = Path(__file__).with_name("pizza.mp4")
-        results = analyzer.analyze_video(str(video_path))
+        results = analyzer.analyze_video_structured(str(video_path))
 
         # Print results
         print("\nBrief Summary:")
         print("-" * 50)
-        print(results['brief_summary'])
+        print(results.summary.brief)
 
         print("\nDetailed Summary:")
         print("-" * 50)
-        print(results['summary'])
+        print(results.summary.detailed)
 
         print("\nVideo Timeline with Audio:")
         print("-" * 50)
-        print(results['timeline'])
+        print(results.summary.timeline)
 
         print("\nAudio Transcript:")
         print("-" * 50)
-        print(results['transcript'])
+        print(results.summary.transcript)
 
         print("\nMetadata:")
         print("-" * 50)
-        for key, value in results['metadata'].items():
-            print(f"{key}: {value}")
+        metadata = results.metadata
+        print(f"num_frames_analyzed: {metadata.num_frames_analyzed}")
+        print(f"num_audio_segments: {metadata.num_audio_segments}")
+        print(f"video_duration: {metadata.video_duration}")
+        print(f"scene_distribution: {metadata.scene_distribution}")
+        print(f"models_used: {metadata.models_used}")
+
+        if results.warnings:
+            print("\nWarnings:")
+            print("-" * 50)
+            for warning in results.warnings:
+                print(warning)
 
     except Exception as e:
         logger.error(f"Error in main: {str(e)}", exc_info=True)

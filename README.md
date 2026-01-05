@@ -10,11 +10,13 @@
 4. [🛠️ Usage](#-usage)
 5. [⚙️ Configuration Options](#-configuration-options)
 6. [🖥️ CLI](#-cli)
-7. [🎯 Customizing Prompts](#-customizing-prompts)
-8. [📈 Applications](#-applications)
-9. [🛠️ Contributing](#-contributing)
-10. [📄 License](#-license)
-11. [📄 Additional Resources](Docs/prompts.md)
+7. [🧪 Playground Demo](#-playground-demo)
+8. [🧱 Structured Outputs](#-structured-outputs)
+9. [🎯 Customizing Prompts](#-customizing-prompts)
+10. [📈 Applications](#-applications)
+11. [🛠️ Contributing](#-contributing)
+12. [📄 License](#-license)
+13. [📄 Additional Resources](Docs/prompts.md)
 
 ## 🚀 Why OpenSceneSense Ollama?
 
@@ -102,7 +104,7 @@ logging.basicConfig(
 
 # Initialize Whisper transcriber
 transcriber = WhisperTranscriber(
-    model_name="openai/whisper-tiny"
+    model_name="openai/whisper-small"
 )
 
 # Custom prompts for analysis
@@ -116,8 +118,8 @@ custom_prompts = AnalysisPrompts(
 
 # Initialize analyzer
 analyzer = OllamaVideoAnalyzer(
-    frame_analysis_model="minicpm-v",
-    summary_model="llama3.2",
+    frame_analysis_model="ministral-3:latest",
+    summary_model="ministral-3:latest",
     min_frames=10,
     max_frames=64,
     frames_per_minute=10.0,
@@ -151,14 +153,14 @@ The `OllamaVideoAnalyzer` class offers extensive configuration options to custom
 
 ### Basic Configuration
 
-- **frame_analysis_model** (str, default="minicpm-v")
+- **frame_analysis_model** (str, default="ministral-3:latest")
   - The Ollama model to use for analyzing individual frames
-  - Common options: "llava", "minicpm-v", "bakllava"
+  - Common options: "ministral-3:latest", "llava", "minicpm-v", "bakllava"
   - Choose models with vision capabilities for best results
 
-- **summary_model** (str, default="llama3.2")
+- **summary_model** (str, default="ministral-3:latest")
   - The Ollama model used for generating video summaries
-  - Common options: "llama3.2", "mistral", "claude-3-haiku"
+  - Common options: "ministral-3:latest", "llama3.2", "mistral"
   - Text-focused models work best for summarization
 
 - **host** (str, default="http://localhost:11434")
@@ -202,7 +204,7 @@ The `OllamaVideoAnalyzer` class offers extensive configuration options to custom
   - Common options:
     ```python
     WhisperTranscriber(
-        model_name="openai/whisper-tiny",
+        model_name="openai/whisper-small",
         device="cuda"  # or "cpu"
     )
     ```
@@ -253,7 +255,7 @@ Here's an example of a fully configured analyzer with custom settings:
 ```python
 analyzer = OllamaVideoAnalyzer(
     frame_analysis_model="llava",
-    summary_model="llama3.2",
+    summary_model="ministral-3:latest",
     host="http://localhost:11434",
     min_frames=12,
     max_frames=48,
@@ -262,7 +264,7 @@ analyzer = OllamaVideoAnalyzer(
         threshold=0.3
     ),
     audio_transcriber=WhisperTranscriber(
-        model_name="openai/whisper-base",
+        model_name="openai/whisper-small",
         device="cuda"
     ),
     prompts=AnalysisPrompts(
@@ -292,6 +294,53 @@ Common options:
 - `--retries` and `--retry-backoff` for retry behavior
 - `--prompts-file` for custom prompt templates
 - `--cache-dir` to reuse results for the same inputs
+- `--structured-output` to emit nested structured JSON
+- `--schema` to print the structured JSON schema
+
+## 🧪 Playground Demo
+
+Use the playground script for deeper tuning and debugging on your own videos:
+
+```bash
+.venv/bin/python Examples/PlaygroundDemo.py /path/to/video.mp4 --audio --print-json
+```
+
+Useful flags include `--segment-duration`, `--beam-size`, `--temperature`, and `--no-collapse-repetitions`.
+
+## 🧱 Structured Outputs
+
+For typed results, use `analyze_video_structured` and convert to JSON when needed:
+
+```python
+from openscenesense_ollama.analyzer import OllamaVideoAnalyzer
+
+analyzer = OllamaVideoAnalyzer()
+result = analyzer.analyze_video_structured("your_video.mp4")
+
+print(result.summary.brief)
+print(result.warnings)
+
+legacy_dict = result.to_legacy_dict()
+structured_dict = result.to_dict()
+```
+
+`analyze_video` still returns the legacy dictionary shape for backward compatibility.
+
+To retrieve a JSON schema:
+
+```python
+from openscenesense_ollama.models import analysis_result_schema
+
+schema = analysis_result_schema()
+```
+
+Or via CLI:
+
+```bash
+openscenesense-ollama --schema
+```
+
+Schema file in repo: `Docs/analysis_result.schema.json`
 
 ## 🎯 Customizing Prompts
 

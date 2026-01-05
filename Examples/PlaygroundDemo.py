@@ -6,12 +6,12 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
-from .analyzer import OllamaVideoAnalyzer
-from .frame_selectors import DynamicFrameSelector, UniformFrameSelector, AllFrameSelector
-from .models import AnalysisPrompts
-from .transcriber import WhisperTranscriber
+from openscenesense_ollama.analyzer import OllamaVideoAnalyzer
+from openscenesense_ollama.frame_selectors import DynamicFrameSelector, UniformFrameSelector, AllFrameSelector
+from openscenesense_ollama.models import AnalysisPrompts
+from openscenesense_ollama.transcriber import WhisperTranscriber
 
 
 def _load_prompts(prompts_file: Optional[str]) -> Dict[str, str]:
@@ -39,7 +39,7 @@ def _build_cache_key(video_path: str, params: Dict[str, Any]) -> str:
     return hashlib.sha256(digest).hexdigest()
 
 
-def _write_output(data: Dict[str, Any], output_path: Optional[str]) -> None:
+def _write_json(data: Dict[str, Any], output_path: Optional[str]) -> None:
     if output_path:
         with open(output_path, "w", encoding="utf-8") as handle:
             json.dump(data, handle, indent=2, ensure_ascii=True)
@@ -48,15 +48,60 @@ def _write_output(data: Dict[str, Any], output_path: Optional[str]) -> None:
     print(json.dumps(data, indent=2, ensure_ascii=True))
 
 
+def _print_summary(data: Dict[str, Any], structured_output: bool) -> None:
+    if structured_output:
+        summary = data["summary"]
+        metadata = data["metadata"]
+        warnings = data.get("warnings", [])
+        brief = summary["brief"]
+        detailed = summary["detailed"]
+        timeline = summary["timeline"]
+        transcript = summary["transcript"]
+    else:
+        metadata = data["metadata"]
+        warnings = data.get("warnings", [])
+        brief = data["brief_summary"]
+        detailed = data["summary"]
+        timeline = data["timeline"]
+        transcript = data["transcript"]
+
+    print("\nBrief Summary:")
+    print("-" * 50)
+    print(brief)
+
+    print("\nDetailed Summary:")
+    print("-" * 50)
+    print(detailed)
+
+    print("\nVideo Timeline with Audio:")
+    print("-" * 50)
+    print(timeline)
+
+    print("\nAudio Transcript:")
+    print("-" * 50)
+    print(transcript)
+
+    print("\nMetadata:")
+    print("-" * 50)
+    for key, value in metadata.items():
+        print(f"{key}: {value}")
+
+    if warnings:
+        print("\nWarnings:")
+        print("-" * 50)
+        for warning in warnings:
+            print(warning)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Analyze videos using OpenSceneSense Ollama and output JSON results."
+        description="Playground demo for experimenting with OpenSceneSense Ollama.",
     )
-    parser.add_argument("video_path", nargs="?", help="Path to the video file")
+    parser.add_argument("video_path", help="Path to the video file")
     parser.add_argument("--frame-model", default="ministral-3:latest")
     parser.add_argument("--summary-model", default="ministral-3:latest")
     parser.add_argument("--host", default="http://localhost:11434")
-    parser.add_argument("--min-frames", type=int, default=8)
+    parser.add_argument("--min-frames", type=int, default=10)
     parser.add_argument("--max-frames", type=int, default=64)
     parser.add_argument("--frames-per-minute", type=float, default=4.0)
     parser.add_argument("--frame-selector", choices=["dynamic", "uniform", "all"], default="dynamic")
@@ -64,6 +109,19 @@ def main() -> int:
     parser.add_argument("--audio", action="store_true", help="Enable Whisper audio transcription")
     parser.add_argument("--whisper-model", default="openai/whisper-small")
     parser.add_argument("--device", default=None)
+    parser.add_argument(
+        "--no-collapse-repetitions",
+        action="store_true",
+        help="Keep repeated short phrases in transcripts",
+    )
+    parser.add_argument("--segment-duration", type=int, default=15)
+    parser.add_argument("--beam-size", type=int, default=5)
+    parser.add_argument("--temperature", type=float, default=0.0)
+    parser.add_argument(
+        "--condition-on-prev-tokens",
+        action="store_true",
+        help="Use previous tokens when decoding (may increase repetition)",
+    )
     parser.add_argument("--timeout", type=float, default=120.0)
     parser.add_argument("--retries", type=int, default=3)
     parser.add_argument("--retry-backoff", type=float, default=1.0)
@@ -74,22 +132,13 @@ def main() -> int:
     parser.add_argument("--output", help="Write results to this JSON file")
     parser.add_argument("--cache-dir", help="Directory to cache analysis results")
     parser.add_argument("--force", action="store_true", help="Ignore cached results")
-    parser.add_argument("--structured-output", action="store_true", help="Output structured JSON results")
-    parser.add_argument("--schema", action="store_true", help="Print the structured output JSON schema and exit")
+    parser.add_argument("--print-json", action="store_true", help="Print full JSON output")
+    parser.add_argument("--legacy-output", action="store_true", help="Use legacy output format")
     parser.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
 
     args = parser.parse_args()
 
     logging.basicConfig(level=getattr(logging, args.log_level))
-
-    if args.schema:
-        from .models import analysis_result_schema
-
-        print(json.dumps(analysis_result_schema(), indent=2, ensure_ascii=True))
-        return 0
-
-    if not args.video_path:
-        parser.error("video_path is required unless --schema is set.")
 
     prompts_data = _load_prompts(args.prompts_file)
     if args.frame_prompt:
@@ -112,7 +161,14 @@ def main() -> int:
         audio_transcriber = WhisperTranscriber(
             model_name=args.whisper_model,
             device=args.device,
+            collapse_repetitions=not args.no_collapse_repetitions,
+            segment_duration=args.segment_duration,
+            beam_size=args.beam_size,
+            temperature=args.temperature,
+            condition_on_prev_tokens=args.condition_on_prev_tokens,
         )
+
+    structured_output = not args.legacy_output
 
     params_for_cache = {
         "frame_model": args.frame_model,
@@ -130,7 +186,7 @@ def main() -> int:
         "retries": args.retries,
         "retry_backoff": args.retry_backoff,
         "prompts": prompts_data,
-        "structured_output": args.structured_output,
+        "structured_output": structured_output,
     }
 
     cache_path = None
@@ -143,7 +199,12 @@ def main() -> int:
         if cache_path.exists() and not args.force:
             with open(cache_path, "r", encoding="utf-8") as handle:
                 cached = json.load(handle)
-            _write_output(cached, args.output)
+            if args.output:
+                _write_json(cached, args.output)
+            if args.print_json:
+                _write_json(cached, None)
+            else:
+                _print_summary(cached, structured_output)
             return 0
 
     analyzer = OllamaVideoAnalyzer(
@@ -162,16 +223,24 @@ def main() -> int:
         request_backoff=args.retry_backoff,
     )
 
-    if args.structured_output:
-        results = analyzer.analyze_video_structured(args.video_path).to_dict()
+    if structured_output:
+        result = analyzer.analyze_video_structured(args.video_path)
+        data = result.to_dict()
     else:
-        results = analyzer.analyze_video(args.video_path)
+        data = analyzer.analyze_video(args.video_path)
 
     if cache_path:
         with open(cache_path, "w", encoding="utf-8") as handle:
-            json.dump(results, handle, indent=2, ensure_ascii=True)
+            json.dump(data, handle, indent=2, ensure_ascii=True)
 
-    _write_output(results, args.output)
+    if args.output:
+        _write_json(data, args.output)
+
+    if args.print_json:
+        _write_json(data, None)
+    else:
+        _print_summary(data, structured_output)
+
     return 0
 
 

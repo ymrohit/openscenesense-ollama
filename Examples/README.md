@@ -1,4 +1,13 @@
 ![pizzagif (2)](https://github.com/user-attachments/assets/f0047189-9714-4f50-bb11-790bf038110c)
+
+## PLAYGROUND DEMO
+
+Run the playground script with your own video:
+
+```bash
+.venv/bin/python Examples/PlaygroundDemo.py /path/to/video.mp4 --audio --print-json
+```
+
 ## OUTPUT
 
 Brief Summary:
@@ -91,4 +100,4 @@ num_frames_analyzed: 9
 num_audio_segments: 0
 video_duration: 12.48
 scene_distribution: {'static': 9, 'action': 0, 'transition': 0}
-models_used: {'frame_analysis': 'minicpm-v', 'summary': 'llama3.2', 'audio': 'WhisperTranscriber'}
+models_used: {'frame_analysis': 'ministral-3:latest', 'summary': 'ministral-3:latest', 'audio': 'WhisperTranscriber'}

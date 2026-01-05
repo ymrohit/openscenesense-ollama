@@ -304,8 +304,8 @@ custom_prompts = AnalysisPrompts(
 
 # Initialize the video analyzer
 analyzer = OllamaVideoAnalyzer(
-    frame_analysis_model="minicpm-v",
-    summary_model="llama3.2",
+    frame_analysis_model="ministral-3:latest",
+    summary_model="ministral-3:latest",
     prompts=custom_prompts,
     min_frames=8,
     max_frames=32,
@@ -369,4 +369,3 @@ To maximize the effectiveness of your prompts within **OpenSceneSense**, conside
 ## 6. Conclusion
 
 These innovative prompt examples are tailored to fit **OpenSceneSense**'s `AnalysisPrompts` structure, providing specialized prompts for **Frame-Based Analysis**, **Detailed Summaries**, and **Brief Summaries**. By integrating these prompts into your workflows, you can unlock deeper insights and build more sophisticated video analysis applications. Customize and expand upon these examples to explore new possibilities and enhance your projects with intelligent video-centric solutions.
-
