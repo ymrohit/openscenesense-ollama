@@ -1,3 +1,4 @@
+from pathlib import Path
 from openscenesense_ollama.models import AnalysisPrompts
 from openscenesense_ollama.transcriber import WhisperTranscriber
 from openscenesense_ollama.analyzer import OllamaVideoAnalyzer
@@ -31,8 +32,8 @@ def main():
 
         # Initialize analyzer with all components
         analyzer = OllamaVideoAnalyzer(
-            frame_analysis_model="minicpm-v",
-            summary_model="llama3.2",
+            frame_analysis_model="ministral-3:latest",
+            summary_model="ministral-3:latest",
             min_frames=10,
             max_frames=64,
             frames_per_minute=10.0,
@@ -43,8 +44,8 @@ def main():
         )
 
         # Analyze video
-        video_path = "pizza.mp4"  # Replace with your video path
-        results = analyzer.analyze_video(video_path)
+        video_path = Path(__file__).with_name("pizza.mp4")
+        results = analyzer.analyze_video(str(video_path))
 
         # Print results
         print("\nBrief Summary:")

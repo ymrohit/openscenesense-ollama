@@ -9,11 +9,12 @@
 3. [📦 Installation](#-installation)
 4. [🛠️ Usage](#-usage)
 5. [⚙️ Configuration Options](#-configuration-options)
-6. [🎯 Customizing Prompts](#-customizing-prompts)
-7. [📈 Applications](#-applications)
-8. [🛠️ Contributing](#-contributing)
-9. [📄 License](#-license)
-10. [📄 Additional Resources](Docs/prompts.md)
+6. [🖥️ CLI](#-cli)
+7. [🎯 Customizing Prompts](#-customizing-prompts)
+8. [📈 Applications](#-applications)
+9. [🛠️ Contributing](#-contributing)
+10. [📄 License](#-license)
+11. [📄 Additional Resources](Docs/prompts.md)
 
 ## 🚀 Why OpenSceneSense Ollama?
 
@@ -189,11 +190,11 @@ The `OllamaVideoAnalyzer` class offers extensive configuration options to custom
 
 - **frame_selector** (Optional[FrameSelector], default=None)
   - Custom frame selection strategy
-  - Defaults to basic uniform selection if None
+  - Defaults to dynamic selection if None
   - Available built-in selectors:
     - `DynamicFrameSelector`: Adapts to scene changes
     - `UniformFrameSelector`: Evenly spaced frames
-    - `ContentAwareSelector`: Selects based on visual importance
+    - `AllFrameSelector`: Selects every frame
 
 - **audio_transcriber** (Optional[AudioTranscriber], default=None)
   - Component for handling audio transcription
@@ -233,6 +234,17 @@ The `OllamaVideoAnalyzer` class offers extensive configuration options to custom
     - `logging.INFO`: General operational information
     - `logging.WARNING`: Warning messages only
     - `logging.ERROR`: Error messages only
+    
+- **request_timeout** (float, default=120.0)
+  - Timeout in seconds for Ollama API requests
+  - Useful for long-running model responses or slow hardware
+
+- **request_retries** (int, default=3)
+  - Number of retry attempts for timeouts or transient API errors
+  - Total attempts = `request_retries + 1`
+
+- **request_backoff** (float, default=1.0)
+  - Exponential backoff in seconds between retries
 
 ### Example Configuration
 
@@ -247,8 +259,7 @@ analyzer = OllamaVideoAnalyzer(
     max_frames=48,
     frames_per_minute=6.0,
     frame_selector=DynamicFrameSelector(
-        threshold=0.3,
-        min_scene_length=1.0
+        threshold=0.3
     ),
     audio_transcriber=WhisperTranscriber(
         model_name="openai/whisper-base",
@@ -260,9 +271,28 @@ analyzer = OllamaVideoAnalyzer(
         brief_summary="Brief summary template..."
     ),
     custom_frame_processor=your_custom_processor,
-    log_level=logging.DEBUG
+    log_level=logging.DEBUG,
+    request_timeout=120.0,
+    request_retries=3,
+    request_backoff=1.0
 )
 ```
+## 🖥️ CLI
+
+Analyze videos from the command line and output JSON results:
+
+```bash
+openscenesense-ollama /path/to/video.mp4 --audio --output result.json --cache-dir .cache
+```
+
+Common options:
+- `--frame-selector dynamic|uniform|all`
+- `--frame-model` and `--summary-model`
+- `--timeout` for Ollama API requests
+- `--retries` and `--retry-backoff` for retry behavior
+- `--prompts-file` for custom prompt templates
+- `--cache-dir` to reuse results for the same inputs
+
 ## 🎯 Customizing Prompts
 
 OpenSceneSense Ollama allows you to customize prompts for different types of analyses. The `AnalysisPrompts` class accepts the following parameters:
@@ -298,4 +328,4 @@ Contributions are welcome! Here's how you can help:
 
 ## 📄 License
 
-Distributed under the MIT License. See  for more information.
+Distributed under the MIT License. See `LICENSE` for more information.

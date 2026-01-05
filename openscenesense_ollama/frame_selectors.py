@@ -5,6 +5,34 @@ from typing import List, Tuple, Optional
 import logging
 from abc import ABC, abstractmethod
 from .models import Frame, SceneType
+from .exceptions import VideoLoadError
+
+
+def _compute_frame_indices(total_frames: int, target_frames: int) -> List[int]:
+    if total_frames <= 0 or target_frames <= 0:
+        return []
+
+    count = min(total_frames, target_frames)
+    indices = np.linspace(0, total_frames - 1, num=count, dtype=int)
+    return sorted(set(indices.tolist()))
+
+
+def _estimate_duration(cap: cv2.VideoCapture, fps: float, total_frames: int) -> float:
+    duration = 0.0
+    if fps and fps > 0 and total_frames > 0:
+        duration = total_frames / fps
+
+    if duration <= 0 and total_frames > 0:
+        current_pos = cap.get(cv2.CAP_PROP_POS_FRAMES)
+        cap.set(cv2.CAP_PROP_POS_FRAMES, max(0, total_frames - 1))
+        ret, _ = cap.read()
+        if ret:
+            pos_ms = cap.get(cv2.CAP_PROP_POS_MSEC)
+            if pos_ms and pos_ms > 0:
+                duration = pos_ms / 1000.0
+        cap.set(cv2.CAP_PROP_POS_FRAMES, current_pos)
+
+    return duration
 
 class FrameSelector(ABC):
     """Abstract base class for frame selection strategies"""
@@ -22,11 +50,18 @@ class FrameSelector(ABC):
         cap = cv2.VideoCapture(video_path)
 
         if not cap.isOpened():
-            raise ValueError(f"Failed to open video file: {video_path}")
+            raise VideoLoadError(f"Failed to open video file: {video_path}")
 
         fps = cap.get(cv2.CAP_PROP_FPS)
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        duration = total_frames / fps
+        duration = _estimate_duration(cap, fps, total_frames)
+
+        if duration <= 0:
+            self.logger.warning(
+                "Video duration could not be determined reliably (fps=%s, total_frames=%s)",
+                fps,
+                total_frames,
+            )
 
         self.logger.info(f"Video properties - FPS: {fps}, Total frames: {total_frames}, Duration: {duration:.2f}s")
         return cap, fps, duration, total_frames
@@ -87,22 +122,15 @@ class DynamicFrameSelector(FrameSelector):
     def _extract_frames(self, cap: cv2.VideoCapture, target_frames: int, scene_changes: List[float]) -> List[Frame]:
         """Extract frames based on scene changes and target count"""
         frames = []
-        ret, first_frame = cap.read()
-        if ret:
-            frames.append(Frame(
-                image=cv2.cvtColor(first_frame, cv2.COLOR_BGR2RGB),
-                timestamp=0.0,
-                scene_type=SceneType.STATIC
-            ))
-
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        interval = total_frames // (target_frames - 1)
+        frame_indices = _compute_frame_indices(total_frames, target_frames)
 
-        for frame_idx in range(interval, total_frames, interval):
+        for frame_idx in frame_indices:
             cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
             ret, frame = cap.read()
             if not ret:
-                break
+                self.logger.warning("Failed to read frame at position %s", frame_idx)
+                continue
 
             timestamp = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -139,11 +167,11 @@ class UniformFrameSelector(FrameSelector):
         if target_frames <= 0:
             return frames
 
-        interval = cap.get(cv2.CAP_PROP_FRAME_COUNT) / target_frames
-        self.logger.debug(f"Frame extraction interval: {interval}")
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        frame_indices = _compute_frame_indices(total_frames, target_frames)
+        self.logger.debug("Frame extraction indices: %s", frame_indices)
 
-        for i in range(target_frames):
-            frame_number = int(i * interval)
+        for frame_number in frame_indices:
             cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
             ret, frame = cap.read()
             if not ret:

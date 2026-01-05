@@ -281,10 +281,13 @@ Integrate these innovative prompts into your **OpenSceneSense** workflows to unl
 
 ### **Example Integration**
 
-Here's how you can integrate these prompts into your **OpenSceneSense** setup:
+Here's how you can integrate these prompts into your **OpenSceneSense Ollama** setup:
 
 ```python
-from openscenesense import ModelConfig, AnalysisPrompts, VideoAnalyzer
+from openscenesense_ollama.models import AnalysisPrompts
+from openscenesense_ollama.analyzer import OllamaVideoAnalyzer
+from openscenesense_ollama.frame_selectors import DynamicFrameSelector
+import logging
 
 # Define custom prompts
 custom_prompts = AnalysisPrompts(
@@ -300,13 +303,9 @@ custom_prompts = AnalysisPrompts(
 )
 
 # Initialize the video analyzer
-analyzer = VideoAnalyzer(
-    api_key="your-openai-api-key",
-    model_config=ModelConfig(
-        vision_model="gpt-4o",           # Vision-capable model
-        text_model="gpt-4o-mini",        # Chat completion model
-        audio_model="whisper-1"          # Whisper model for audio transcription
-    ),
+analyzer = OllamaVideoAnalyzer(
+    frame_analysis_model="minicpm-v",
+    summary_model="llama3.2",
     prompts=custom_prompts,
     min_frames=8,
     max_frames=32,
@@ -370,5 +369,4 @@ To maximize the effectiveness of your prompts within **OpenSceneSense**, conside
 ## 6. Conclusion
 
 These innovative prompt examples are tailored to fit **OpenSceneSense**'s `AnalysisPrompts` structure, providing specialized prompts for **Frame-Based Analysis**, **Detailed Summaries**, and **Brief Summaries**. By integrating these prompts into your workflows, you can unlock deeper insights and build more sophisticated video analysis applications. Customize and expand upon these examples to explore new possibilities and enhance your projects with intelligent video-centric solutions.
-
 

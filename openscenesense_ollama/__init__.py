@@ -1,7 +1,7 @@
 from openscenesense_ollama.analyzer import OllamaVideoAnalyzer
 from openscenesense_ollama.models import Frame,AudioSegment,AnalysisPrompts,SceneType
 from openscenesense_ollama.transcriber import WhisperTranscriber,AudioTranscriber
-from openscenesense_ollama.frame_selectors import DynamicFrameSelector
+from openscenesense_ollama.frame_selectors import DynamicFrameSelector, UniformFrameSelector, AllFrameSelector
 
 __all__ = [
     'OllamaVideoAnalyzer',
@@ -11,5 +11,7 @@ __all__ = [
     'SceneType',
     'WhisperTranscriber',
     'AudioTranscriber',
-    'DynamicFrameSelector'
+    'DynamicFrameSelector',
+    'UniformFrameSelector',
+    'AllFrameSelector'
 ]

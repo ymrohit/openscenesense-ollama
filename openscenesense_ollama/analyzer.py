@@ -9,6 +9,7 @@ import io
 import base64
 import requests
 import time
+from .video_utils import get_video_duration
 
 class OllamaVideoAnalyzer:
     def __init__(
@@ -23,7 +24,10 @@ class OllamaVideoAnalyzer:
             audio_transcriber: Optional[AudioTranscriber] = None,
             prompts: Optional[AnalysisPrompts] = None,
             custom_frame_processor: Optional[Callable[[Frame], Dict]] = None,
-            log_level: int = logging.INFO
+            log_level: int = logging.INFO,
+            request_timeout: float = 120.0,
+            request_retries: int = 3,
+            request_backoff: float = 1.0
     ):
         self.frame_analysis_model = frame_analysis_model
         self.summary_model = summary_model
@@ -37,6 +41,11 @@ class OllamaVideoAnalyzer:
         self.prompts = prompts or AnalysisPrompts()
         self.custom_frame_processor = custom_frame_processor
         self.logger = logging.getLogger(__name__)
+        self.session = requests.Session()
+        self.request_timeout = request_timeout
+        self.request_retries = max(0, request_retries)
+        self.request_backoff = max(0.0, request_backoff)
+        self.retry_status_codes = {408, 429, 500, 502, 503, 504}
         logging.basicConfig(level=log_level)
 
     def _frame_to_base64(self, frame: np.ndarray) -> str:
@@ -78,6 +87,52 @@ class OllamaVideoAnalyzer:
             f"Calculated uniform frame count: {optimal_frames} (Base: {base_frames}, Min: {self.min_frames}, Max: {self.max_frames})")
         return optimal_frames
 
+    def _sleep_with_backoff(self, attempt: int) -> None:
+        delay = self.request_backoff * (2 ** (attempt - 1))
+        if delay > 0:
+            time.sleep(delay)
+
+    def _post_with_retries(self, payload: Dict, request_label: str) -> requests.Response:
+        attempts = self.request_retries + 1
+        for attempt in range(1, attempts + 1):
+            try:
+                response = self.session.post(
+                    self.api_endpoint,
+                    json=payload,
+                    timeout=self.request_timeout,
+                )
+                if response.status_code in self.retry_status_codes:
+                    raise requests.exceptions.HTTPError(
+                        f"Retryable HTTP status {response.status_code}",
+                        response=response,
+                    )
+                response.raise_for_status()
+                return response
+            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as exc:
+                if attempt >= attempts:
+                    raise
+                self.logger.warning(
+                    "Ollama %s request failed (attempt %s/%s): %s",
+                    request_label,
+                    attempt,
+                    attempts,
+                    exc,
+                )
+                self._sleep_with_backoff(attempt)
+            except requests.exceptions.HTTPError as exc:
+                status = exc.response.status_code if exc.response else None
+                if status in self.retry_status_codes and attempt < attempts:
+                    self.logger.warning(
+                        "Ollama %s request returned %s (attempt %s/%s)",
+                        request_label,
+                        status,
+                        attempt,
+                        attempts,
+                    )
+                    self._sleep_with_backoff(attempt)
+                    continue
+                raise
+
     def _analyze_frame(self, frame: Frame, context: Optional[str] = None) -> Dict:
         """Analyze a single frame using the frame analysis model"""
         if self.custom_frame_processor:
@@ -101,7 +156,7 @@ class OllamaVideoAnalyzer:
         }
 
         try:
-            response = requests.post(self.api_endpoint, json=payload)
+            response = self._post_with_retries(payload, "frame analysis")
             result = response.json()
             if "message" in result:
                 return {
@@ -137,7 +192,7 @@ class OllamaVideoAnalyzer:
                 "messages": [{"role": "user", "content": detailed_prompt}],
                 "stream": False
             }
-            detailed_response = requests.post(self.api_endpoint, json=detailed_payload)
+            detailed_response = self._post_with_retries(detailed_payload, "summary (detailed)")
             detailed_result = detailed_response.json()
 
             # Get brief summary
@@ -151,7 +206,7 @@ class OllamaVideoAnalyzer:
                 "messages": [{"role": "user", "content": brief_prompt}],
                 "stream": False
             }
-            brief_response = requests.post(self.api_endpoint, json=brief_payload)
+            brief_response = self._post_with_retries(brief_payload, "summary (brief)")
             brief_result = brief_response.json()
 
             return {
@@ -211,7 +266,8 @@ class OllamaVideoAnalyzer:
                 time.sleep(0.1)  # Rate limiting
 
             # Generate summaries with both video and audio
-            video_duration = frames[-1].timestamp if frames else 0
+            fallback_duration = frames[-1].timestamp if frames else 0.0
+            video_duration = get_video_duration(video_path, fallback_duration=fallback_duration)
             self.logger.info("Generating video and audio summaries")
             summaries = self._generate_summary(frame_descriptions, audio_segments, video_duration)
 

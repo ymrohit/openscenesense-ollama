@@ -25,8 +25,17 @@ dependencies = [
     "ffmpeg-python>=0.2.0"
 ]
 
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[project.scripts]
+openscenesense-ollama = "openscenesense_ollama.cli:main"
+
 [tool.hatch.build.targets.wheel]
 packages = ["openscenesense_ollama"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [project.urls]
 Homepage = "https://github.com/ymrohit/openscenesense-ollama"

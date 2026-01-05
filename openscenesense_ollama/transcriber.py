@@ -6,6 +6,7 @@ import numpy as np
 import logging
 from .models import AudioSegment
 import torch
+from .exceptions import TranscriptionError
 
 class AudioTranscriber(ABC):
     """Abstract base class for audio transcription strategies"""
@@ -37,6 +38,7 @@ class WhisperTranscriber(AudioTranscriber):
         self.processor = WhisperProcessor.from_pretrained(model_name)
         self.model = WhisperForConditionalGeneration.from_pretrained(model_name)
         self.model.to(device)
+        self.model.eval()
 
         # Disable forced decoder ids
         self.model.config.forced_decoder_ids = None
@@ -65,7 +67,7 @@ class WhisperTranscriber(AudioTranscriber):
 
         except Exception as e:
             self.logger.error(f"Error extracting audio with librosa: {str(e)}")
-            raise
+            raise TranscriptionError(f"Error extracting audio with librosa: {str(e)}") from e
 
 
     def _segment_audio(self, audio: np.ndarray, sampling_rate: int, segment_duration: int = 30) -> List[
@@ -107,7 +109,8 @@ class WhisperTranscriber(AudioTranscriber):
                 ).input_features.to(self.device)
 
                 # Generate transcription
-                predicted_ids = self.model.generate(input_features)
+                with torch.no_grad():
+                    predicted_ids = self.model.generate(input_features)
 
                 # Decode transcription
                 transcription = self.processor.batch_decode(
@@ -133,4 +136,4 @@ class WhisperTranscriber(AudioTranscriber):
 
         except Exception as e:
             self.logger.error(f"Transcription failed: {str(e)}")
-            raise
+            raise TranscriptionError(f"Transcription failed: {str(e)}") from e
