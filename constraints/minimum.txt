@@ -1,6 +1,6 @@
 # Minimum direct runtime dependencies supported by v1.2.
 numpy==2.0.2
 opencv-python==4.10.0.84
-Pillow==11.0.0
+Pillow==12.3.0
 requests==2.32.3
 ffmpeg-python==0.2.0
