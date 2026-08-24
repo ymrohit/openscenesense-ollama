@@ -38,7 +38,7 @@ dev = [
     "build>=1.2,<2",
     "jsonschema>=4.23,<5",
     "pytest>=8,<10",
-    "pytest-cov>=6,<8",
+    "pytest-cov>=7.1.0,<8",
     "ruff>=0.12,<1",
     "twine>=7,<8",
 ]
