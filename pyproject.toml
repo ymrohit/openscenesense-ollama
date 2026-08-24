@@ -24,7 +24,7 @@ classifiers = [
 dependencies = [
     "numpy>=2.0.2,<3",
     "opencv-python>=4.10.0.84,<6",
-    "pillow>=11.0.0,<13",
+    "pillow>=12.3.0,<13",
     "requests>=2.32.3,<3",
     "ffmpeg-python>=0.2.0,<0.3",
 ]
