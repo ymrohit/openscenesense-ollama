@@ -36,7 +36,7 @@ audio = [
 ]
 dev = [
     "build>=1.2,<2",
-    "jsonschema>=4.23,<5",
+    "jsonschema>=4.26.0,<5",
     "pytest>=8,<10",
     "pytest-cov>=6,<8",
     "ruff>=0.12,<1",
