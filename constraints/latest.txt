@@ -1,0 +1,6 @@
+# Direct dependency freeze for release validation (2026-08-24).
+numpy==2.5.2
+opencv-python==5.0.0.93
+Pillow==12.3.0
+requests==2.34.2
+ffmpeg-python==0.2.0

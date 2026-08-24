@@ -1,13 +1,12 @@
-from abc import ABC, abstractmethod
-from transformers import WhisperProcessor, WhisperForConditionalGeneration
-from typing import List, Dict, Tuple, Optional, Callable
-import numpy as np
 import logging
-import torch
-import ffmpeg
 import re
+from abc import ABC, abstractmethod
+
+import ffmpeg
+import numpy as np
+
+from .exceptions import MissingDependencyError, TranscriptionError
 from .models import AudioSegment
-from .exceptions import TranscriptionError
 
 
 def _collapse_repeated_phrases(
@@ -37,6 +36,7 @@ def _collapse_repeated_phrases(
 
     return " ".join(result)
 
+
 class AudioTranscriber(ABC):
     """Abstract base class for audio transcription strategies"""
 
@@ -44,7 +44,7 @@ class AudioTranscriber(ABC):
         self.logger = logging.getLogger(self.__class__.__name__)
 
     @abstractmethod
-    def transcribe(self, video_path: str) -> List[AudioSegment]:
+    def transcribe(self, video_path: str) -> list[AudioSegment]:
         pass
 
 
@@ -52,20 +52,31 @@ class WhisperTranscriber(AudioTranscriber):
     """Audio transcription using OpenAI's Whisper model with direct model interaction"""
 
     def __init__(
-            self,
-            model_name: str = "openai/whisper-small",
-            device: Optional[str] = None,
-            language: Optional[str] = None,
-            task: str = "transcribe",
-            collapse_repetitions: bool = False,
-            min_repeated_phrases: int = 5,
-            max_repeat_phrase_words: int = 5,
-            segment_duration: int = 30,
-            beam_size: int = 1,
-            temperature: Optional[float] = None,
-            condition_on_prev_tokens: Optional[bool] = None,
+        self,
+        model_name: str = "openai/whisper-small",
+        device: str | None = None,
+        language: str | None = None,
+        task: str = "transcribe",
+        collapse_repetitions: bool = False,
+        min_repeated_phrases: int = 5,
+        max_repeat_phrase_words: int = 5,
+        segment_duration: int = 30,
+        min_segment_duration: float = 5.0,
+        beam_size: int = 1,
+        temperature: float | None = None,
+        condition_on_prev_tokens: bool | None = None,
     ):
         super().__init__()
+        try:
+            import torch
+            from transformers import WhisperForConditionalGeneration, WhisperProcessor
+        except ImportError as exc:
+            raise MissingDependencyError(
+                "Local transcription requires the audio extra:\n"
+                'pip install "openscenesense-ollama[audio]"'
+            ) from exc
+
+        self._torch = torch
         if device is None:
             device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
@@ -77,6 +88,10 @@ class WhisperTranscriber(AudioTranscriber):
         self.min_repeated_phrases = max(1, min_repeated_phrases)
         self.max_repeat_phrase_words = max(1, max_repeat_phrase_words)
         self.segment_duration = max(1, segment_duration)
+        self.min_segment_duration = min(
+            max(0.1, float(self.segment_duration) / 2),
+            max(0.1, float(min_segment_duration)),
+        )
         self.beam_size = max(1, beam_size)
         self.temperature = temperature
         self.condition_on_prev_tokens = condition_on_prev_tokens
@@ -106,8 +121,8 @@ class WhisperTranscriber(AudioTranscriber):
         streams = info.get("streams", [])
         return any(stream.get("codec_type") == "audio" for stream in streams)
 
-    def _extract_audio(self, video_path: str) -> Tuple[np.ndarray, int]:
-        """Extract audio from video file and return as numpy array with sampling rate using ffmpeg"""
+    def _extract_audio(self, video_path: str) -> tuple[np.ndarray, int]:
+        """Extract audio with FFmpeg and return float32 samples plus sampling rate."""
         try:
             if not self._has_audio_stream(video_path):
                 raise TranscriptionError(f"No audio stream found in {video_path}")
@@ -139,16 +154,27 @@ class WhisperTranscriber(AudioTranscriber):
             self.logger.error(f"Error extracting audio with ffmpeg: {str(e)}")
             raise TranscriptionError(f"Error extracting audio with ffmpeg: {str(e)}") from e
 
-
-    def _segment_audio(self, audio: np.ndarray, sampling_rate: int, segment_duration: int) -> List[
-        Tuple[np.ndarray, float]]:
+    @staticmethod
+    def _segment_audio(
+        audio: np.ndarray,
+        sampling_rate: int,
+        segment_duration: int,
+        min_segment_duration: float = 5.0,
+    ) -> list[tuple[np.ndarray, float]]:
         """Segment audio into chunks for processing"""
         segment_length = segment_duration * sampling_rate
+        minimum_length = min(
+            max(1, segment_length // 2),
+            max(1, round(min_segment_duration * sampling_rate)),
+        )
         segments = []
         start_idx = 0
 
         while start_idx < len(audio):
             end_idx = min(start_idx + segment_length, len(audio))
+            trailing_length = len(audio) - end_idx
+            if 0 < trailing_length < minimum_length:
+                end_idx = len(audio) - minimum_length
             segment = audio[start_idx:end_idx]
             start_time = start_idx / sampling_rate
             segments.append((segment, start_time))
@@ -156,7 +182,7 @@ class WhisperTranscriber(AudioTranscriber):
 
         return segments
 
-    def transcribe(self, video_path: str) -> List[AudioSegment]:
+    def transcribe(self, video_path: str) -> list[AudioSegment]:
         """Transcribe audio from video file using Whisper"""
         self.logger.info(f"Starting audio transcription for {video_path}")
 
@@ -169,6 +195,7 @@ class WhisperTranscriber(AudioTranscriber):
                 audio_array,
                 self.target_sampling_rate,
                 self.segment_duration,
+                self.min_segment_duration,
             )
 
             transcribed_segments = []
@@ -203,13 +230,12 @@ class WhisperTranscriber(AudioTranscriber):
                 if self.condition_on_prev_tokens is not None:
                     generate_kwargs["condition_on_prev_tokens"] = self.condition_on_prev_tokens
 
-                with torch.inference_mode():
+                with self._torch.inference_mode():
                     predicted_ids = self.model.generate(input_features, **generate_kwargs)
 
                 # Decode transcription
                 transcription = self.processor.batch_decode(
-                    predicted_ids,
-                    skip_special_tokens=True
+                    predicted_ids, skip_special_tokens=True
                 )[0]  # Take first element as we process one segment at a time
                 transcription = transcription.strip()
                 if self.collapse_repetitions:
@@ -227,7 +253,7 @@ class WhisperTranscriber(AudioTranscriber):
                     text=transcription,
                     start_time=start_time,
                     end_time=start_time + duration,
-                    confidence=1.0  # Note: Basic Whisper doesn't provide confidence scores
+                    confidence=1.0,  # Note: Basic Whisper doesn't provide confidence scores
                 )
 
                 transcribed_segments.append(segment)

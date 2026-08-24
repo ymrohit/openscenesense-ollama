@@ -1,10 +1,10 @@
 from openscenesense_ollama.models import (
-    AnalysisResult,
-    SummaryResult,
-    FrameAnalysis,
-    AudioSegment,
     AnalysisMetadata,
+    AnalysisResult,
+    AudioSegment,
+    FrameAnalysis,
     ModelsUsed,
+    SummaryResult,
     analysis_result_schema,
 )
 

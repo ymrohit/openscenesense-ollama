@@ -1,12 +1,4 @@
-# This workflow will upload a Python Package using Twine when a release is created
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python#publishing-to-package-registries
-
-# This workflow uses actions that are not certified by GitHub.
-# They are provided by a third-party and are governed by
-# separate terms of service, privacy policy, and support
-# documentation.
-
-name: Upload Python Package
+name: publish
 
 on:
   release:
@@ -16,24 +8,57 @@ permissions:
   contents: read
 
 jobs:
-  deploy:
-
+  build-and-verify:
     runs-on: ubuntu-latest
-
     steps:
-    - uses: actions/checkout@v4
-    - name: Set up Python
-      uses: actions/setup-python@v5.3.0
-      with:
-        python-version: '3.x'
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install build
-    - name: Build package
-      run: python -m build
-    - name: Publish package
-      uses: pypa/gh-action-pypi-publish@27b31702a0e7fc50959f5ad993c78deac1bdfc29
-      with:
-        user: __token__
-        password: ${{ secrets.PYPI_TOKEN }}
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install FFmpeg and release tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          python -m pip install --upgrade pip
+          python -m pip install -e '.[dev]'
+      - name: Verify source and lightweight import
+        run: |
+          python -m pytest
+          python -c 'import sys, openscenesense_ollama; assert "torch" not in sys.modules; assert "transformers" not in sys.modules'
+          ruff check openscenesense_ollama tests scripts benchmarks Examples
+          ruff format --check openscenesense_ollama tests scripts benchmarks Examples
+          python scripts/export_schema.py
+          git diff --exit-code -- Docs/analysis_result.schema.json
+      - name: Build once
+        run: python -m build
+      - name: Inspect exact release artifacts
+        run: python scripts/inspect_dist.py && python -m twine check --strict dist/*
+      - name: Smoke-test exact lightweight wheel
+        run: |
+          python -m venv .release-smoke
+          .release-smoke/bin/python -m pip install --upgrade pip
+          .release-smoke/bin/python -m pip install dist/*.whl
+          .release-smoke/bin/openscenesense-ollama --schema > /dev/null
+          .release-smoke/bin/python -m pip check
+      - uses: actions/upload-artifact@v7
+        with:
+          name: pypi-distributions
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    runs-on: ubuntu-latest
+    needs: [build-and-verify]
+    environment:
+      name: pypi
+      url: https://pypi.org/p/openscenesense-ollama
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: pypi-distributions
+          path: dist/
+      - name: Publish exact tested artifacts
+        uses: pypa/gh-action-pypi-publish@v1.14.2
