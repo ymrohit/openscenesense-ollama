@@ -1,0 +1,28 @@
+name: local Ollama integration
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ollama:
+    runs-on: [self-hosted, ollama]
+    timeout-minutes: 20
+    env:
+      OLLAMA_HOST: ${{ vars.OLLAMA_HOST }}
+      OLLAMA_VISION_MODEL: ${{ vars.OLLAMA_VISION_MODEL }}
+      OLLAMA_SUMMARY_MODEL: ${{ vars.OLLAMA_SUMMARY_MODEL }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install package
+        run: python -m pip install --upgrade pip && python -m pip install -e '.[dev]'
+      - name: Verify environment
+        run: openscenesense-ollama --check --frame-model "${OLLAMA_VISION_MODEL:-ministral-3:latest}" --summary-model "${OLLAMA_SUMMARY_MODEL:-ministral-3:latest}"
+      - name: Run bounded local integration
+        run: python scripts/live_integration.py

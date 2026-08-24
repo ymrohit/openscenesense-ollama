@@ -1,24 +1,57 @@
-# Custom exceptions for better error handling
-class VideoAnalysisError(Exception):
-    """Base exception class for video analysis errors"""
+class OpenSceneSenseError(Exception):
+    """Base exception for expected OpenSceneSense Ollama failures."""
+
+
+class ConfigurationError(OpenSceneSenseError, ValueError):
     pass
 
-class VideoLoadError(VideoAnalysisError):
-    """Raised when there are issues loading or accessing the video file"""
+
+class MissingDependencyError(OpenSceneSenseError, ImportError):
     pass
 
-class TranscriptionError(VideoAnalysisError):
-    """Raised when audio transcription fails"""
+
+class VideoLoadError(OpenSceneSenseError):
     pass
 
-class FrameExtractionError(VideoAnalysisError):
-    """Raised when frame extraction fails"""
+
+class VideoMetadataError(OpenSceneSenseError):
     pass
 
-class ModelInferenceError(VideoAnalysisError):
-    """Raised when AI model inference fails"""
+
+class AudioExtractionError(OpenSceneSenseError):
     pass
 
-class APIError(VideoAnalysisError):
-    """Raised when API calls fail"""
+
+class TranscriptionError(OpenSceneSenseError):
     pass
+
+
+class ProviderConnectionError(OpenSceneSenseError):
+    pass
+
+
+class AuthenticationError(OpenSceneSenseError):
+    pass
+
+
+class RateLimitError(OpenSceneSenseError):
+    pass
+
+
+class ModelNotFoundError(OpenSceneSenseError):
+    pass
+
+
+class ModelCapabilityError(OpenSceneSenseError):
+    pass
+
+
+class ResponseValidationError(OpenSceneSenseError):
+    pass
+
+
+# v1.1 compatibility names.
+VideoAnalysisError = OpenSceneSenseError
+FrameExtractionError = VideoLoadError
+ModelInferenceError = ResponseValidationError
+APIError = ProviderConnectionError

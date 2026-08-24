@@ -1,0 +1,40 @@
+name: build
+
+on:
+  push:
+    branches: ["master"]
+  pull_request:
+    branches: ["master"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  distributions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Build wheel and source distribution
+        run: python -m pip install --upgrade pip build twine && python -m build
+      - name: Inspect release contents and budgets
+        run: python scripts/inspect_dist.py && python -m twine check --strict dist/*
+      - name: Install wheel in a clean environment
+        run: |
+          python -m venv .wheel-smoke
+          .wheel-smoke/bin/python -m pip install --upgrade pip
+          .wheel-smoke/bin/python -m pip install dist/*.whl
+      - name: Smoke-test lightweight installed package
+        run: |
+          .wheel-smoke/bin/python -c 'import sys, openscenesense_ollama; assert openscenesense_ollama.__version__ == "1.2.0"; assert "torch" not in sys.modules; assert "transformers" not in sys.modules'
+          .wheel-smoke/bin/openscenesense-ollama --schema > /dev/null
+          .wheel-smoke/bin/python -m pip check
+      - uses: actions/upload-artifact@v7
+        with:
+          name: openscenesense-ollama-distributions
+          path: dist/
+          if-no-files-found: error
