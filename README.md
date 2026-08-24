@@ -103,6 +103,7 @@ Useful options:
 --max-workers
 --max-image-dimension / --jpeg-quality
 --audio / --whisper-model / --device
+--audio-segment-duration / --audio-min-segment-duration
 --no-structured-output
 --strict / --max-frame-failure-ratio
 --cache-dir / --resume / --force
@@ -122,6 +123,7 @@ transcriber = WhisperTranscriber(
     device="cuda:0",  # Use "cpu" when CUDA is unavailable.
     language="en",
     segment_duration=30,
+    min_segment_duration=5,
 )
 
 analyzer = OllamaVideoAnalyzer(
@@ -129,7 +131,10 @@ analyzer = OllamaVideoAnalyzer(
 )
 ```
 
-Whisper audio is extracted directly through FFmpeg as mono 16 kHz float32 samples. librosa is not required. If the audio extra is absent, the package raises an actionable installation message rather than failing during import.
+Whisper audio is extracted directly through FFmpeg as mono 16 kHz float32 samples. Short trailing
+audio is rebalanced into a useful final chunk instead of being decoded alone, reducing end-of-file
+hallucinations. librosa is not required. If the audio extra is absent, the package raises an
+actionable installation message rather than failing during import.
 
 CLI equivalent:
 
@@ -306,6 +311,7 @@ More detail:
 - [Performance](Docs/performance.md)
 - [Troubleshooting](Docs/troubleshooting.md)
 - [Models, hardware, and privacy](Docs/models-and-hardware.md)
+- [Live release validation](Docs/live-validation.md)
 - [v1.2 migration](Docs/v1.2-migration.md)
 
 ## License

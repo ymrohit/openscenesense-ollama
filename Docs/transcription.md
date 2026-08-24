@@ -20,3 +20,7 @@ FFmpeg extracts mono 16 kHz float32 audio directly, so librosa is not required. 
 `AudioTranscriber` to integrate another local engine, or leave `audio_transcriber=None` for visual
 analysis only. Initial model downloads require network access and are never started automatically
 by OpenSceneSense.
+
+`WhisperTranscriber` selects `cuda:0` automatically when the installed Torch build exposes CUDA;
+otherwise it uses CPU. `segment_duration=30` and `min_segment_duration=5` rebalance a very short
+end-of-file tail into the preceding split so Whisper does not decode a sub-second chunk alone.

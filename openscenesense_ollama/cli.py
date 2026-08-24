@@ -89,6 +89,8 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--audio", action="store_true", help="Enable local Whisper transcription")
     parser.add_argument("--whisper-model", default="openai/whisper-small")
     parser.add_argument("--device")
+    parser.add_argument("--audio-segment-duration", type=int, default=30)
+    parser.add_argument("--audio-min-segment-duration", type=float, default=5.0)
     parser.add_argument("--timeout", type=float, default=120.0)
     parser.add_argument("--retries", type=int, default=3)
     parser.add_argument("--retry-backoff", type=float, default=1.0)
@@ -164,6 +166,8 @@ def main(argv: list[str] | None = None) -> int:
             audio_transcriber = WhisperTranscriber(
                 model_name=args.whisper_model,
                 device=args.device,
+                segment_duration=args.audio_segment_duration,
+                min_segment_duration=args.audio_min_segment_duration,
             )
 
         analyzer = OllamaVideoAnalyzer(

@@ -18,6 +18,8 @@
 - Torch and Transformers moved to the optional `[audio]` extra and are imported lazily.
 - Sequential sliding-context analysis remains the default; independent frames may run concurrently.
 - `analyze_video()` retains the legacy dictionary with additive telemetry.
+- Whisper rebalances sub-minimum end-of-file audio tails into useful final chunks to reduce
+  hallucinations from decoding sub-second fragments in isolation.
 
 ### Removed
 

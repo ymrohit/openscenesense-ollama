@@ -61,6 +61,7 @@ class WhisperTranscriber(AudioTranscriber):
         min_repeated_phrases: int = 5,
         max_repeat_phrase_words: int = 5,
         segment_duration: int = 30,
+        min_segment_duration: float = 5.0,
         beam_size: int = 1,
         temperature: float | None = None,
         condition_on_prev_tokens: bool | None = None,
@@ -87,6 +88,10 @@ class WhisperTranscriber(AudioTranscriber):
         self.min_repeated_phrases = max(1, min_repeated_phrases)
         self.max_repeat_phrase_words = max(1, max_repeat_phrase_words)
         self.segment_duration = max(1, segment_duration)
+        self.min_segment_duration = min(
+            max(0.1, float(self.segment_duration) / 2),
+            max(0.1, float(min_segment_duration)),
+        )
         self.beam_size = max(1, beam_size)
         self.temperature = temperature
         self.condition_on_prev_tokens = condition_on_prev_tokens
@@ -149,16 +154,27 @@ class WhisperTranscriber(AudioTranscriber):
             self.logger.error(f"Error extracting audio with ffmpeg: {str(e)}")
             raise TranscriptionError(f"Error extracting audio with ffmpeg: {str(e)}") from e
 
+    @staticmethod
     def _segment_audio(
-        self, audio: np.ndarray, sampling_rate: int, segment_duration: int
+        audio: np.ndarray,
+        sampling_rate: int,
+        segment_duration: int,
+        min_segment_duration: float = 5.0,
     ) -> list[tuple[np.ndarray, float]]:
         """Segment audio into chunks for processing"""
         segment_length = segment_duration * sampling_rate
+        minimum_length = min(
+            max(1, segment_length // 2),
+            max(1, round(min_segment_duration * sampling_rate)),
+        )
         segments = []
         start_idx = 0
 
         while start_idx < len(audio):
             end_idx = min(start_idx + segment_length, len(audio))
+            trailing_length = len(audio) - end_idx
+            if 0 < trailing_length < minimum_length:
+                end_idx = len(audio) - minimum_length
             segment = audio[start_idx:end_idx]
             start_time = start_idx / sampling_rate
             segments.append((segment, start_time))
@@ -179,6 +195,7 @@ class WhisperTranscriber(AudioTranscriber):
                 audio_array,
                 self.target_sampling_rate,
                 self.segment_duration,
+                self.min_segment_duration,
             )
 
             transcribed_segments = []
